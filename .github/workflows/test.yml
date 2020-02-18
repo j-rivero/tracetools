@@ -1,0 +1,46 @@
+name: Test tracetools coverage
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  build_and_test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-18.04]
+    steps:
+      - name: Install lttng ppa
+        run: |
+           sudo apt-add-repository -y ppa:lttng/stable-2.10
+           sudo apt-get update
+           sudo apt-get install -y lttng-tools lttng-modules-dkms liblttng-ust-dev
+           sudo apt-get install -y python3-babeltrace python3-lttng
+           sudo lttng-sessiond --daemonize
+      - uses: ros-tooling/setup-ros@master
+        # with:
+        #  required-ros-distributions: eloquent
+      - uses: j-rivero/action-ros-ci@use_test_filter
+        with:
+          package-name: tracetools tracetools_test
+          colcon-mixin-name: coverage-gcc
+          colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/master/index.yaml
+          coverage-ignore-pattern: '*/test* */tracetools_test/*'
+      - uses: codecov/codecov-action@master
+        # Prevent being rate limited by only reporting coverage from the Ubuntu
+        # build.
+        if: matrix.os == 'ubuntu-18.04'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ros_ws/lcov/total_coverage.info
+          flags: unittests
+          name: codecov-umbrella
+          yml: codecov.yml
+          fail_ci_if_error: false
+      - uses: actions/upload-artifact@master
+        with:
+          name: colcon-logs-${{ matrix.os }}
+          path: ros_ws/log
